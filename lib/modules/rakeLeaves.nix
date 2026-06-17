@@ -29,10 +29,12 @@ let
             # Keep all folder and files except standby, ignore, and `default.nix`
             filterDir = name: type:
                 name != "default.nix" &&
+                !(lib.hasPrefix "backup." name) &&
+                !(lib.hasPrefix "bckp." name) &&
                 !(lib.hasPrefix "standby." name) &&
                 !(lib.hasPrefix "stby." name) &&
+                !(lib.hasPrefix "stb." name) &&
                 !(lib.hasPrefix "ignore." name) &&
-                !(lib.hasPrefix "wip." name) &&
                 ((type == "regular" && lib.hasSuffix ".nix" name) || type == "directory");
             validNodes = lib.filterAttrs (name: type: filterDir name type) contents;
     

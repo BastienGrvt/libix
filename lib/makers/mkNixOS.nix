@@ -14,7 +14,8 @@
 
 let
     inherit (inputs) self nixpkgs;
-    lib = nixpkgs.lib; 
+    hasUnstable = inputs ? nixpkgs-unstable;
+    lib = nixpkgs.lib;
 in
     { buildContext, buildInventory }:
         let
@@ -22,24 +23,31 @@ in
             inherit (buildContext) overlays extraArgs;
             commonModulesResolved = myLib.modules.resolvePaths commonModules;
 
+            mkPkgs = pkgsSource: system:
+                import pkgsSource {
+                    inherit system overlays;
+                    config.allowUnfree = true;
+                };
+
             mkHost = host:
                 let
-                    # Cook pkgs
-                    pkgs = import nixpkgs {
-                        system = host.system;
-                        config.allowUnfree = true;
-                        overlays = overlays;
+                    # Pkgs
+                    pkgs = mkPkgs nixpkgs host.system;
+
+                    # Special args with unstable pkgs
+                    specialArgs = extraArgs // lib.optionalAttrs hasUnstable {
+                        pkgs-unstable = mkPkgs inputs.nixpkgs-unstable host.system;
                     };
                     
-                    # Host specific modules
-                    nixosModules = [ { nix.pkgs = pkgs; } ];
+                    # Default modules
+                    nixosModules = [ { nixpkgs.pkgs = pkgs; } ];
                     hostModules = [ "${self}/${hostsPath}/${host.confDir}" ];
                     isoModules = lib.optionals (host.iso or false) [ "${self}/iso/installer.nix" ];
                 in
-                nixpkgs.lib.nixosSystem {
-                    specialArgs = extraArgs;
+                lib.nixosSystem {
+                    specialArgs = specialArgs;
                     modules = commonModulesResolved ++ nixosModules ++ hostModules ++ isoModules;
                 };
 
-        in 
+        in
             builtins.mapAttrs (name: host: mkHost host) hosts

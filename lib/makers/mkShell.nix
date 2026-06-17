@@ -61,3 +61,4 @@ in
                 lib.recursiveUpdate acc
                     (builtins.listToAttrs [ (mkShell name shell) ])
             ) {} shells
+
