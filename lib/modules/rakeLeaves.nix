@@ -1,0 +1,68 @@
+/**
+  Recursively import Nix files from a directory tree into a nested attribute set.
+  A directory containing a `default.nix` is treated as a single leaf.
+
+  # Type
+  rakeLeaves :: { dir, args } -> AttrSet
+
+  # Args
+  - dir: The root directory path to scan.
+  - args: The attribute set of arguments to pass to each imported Nix file.
+
+  # Example
+    rakeLeaves {
+      dir = ./my-folder;
+      args = { inherit inputs myLib; };
+    }
+*/
+
+{ inputs, myLib }:
+
+let
+    lib = inputs.nixpkgs.lib;
+
+    autoImport = {dir, args}:
+        let
+            # Get `dir` contents as the attrset `{ "file_name" = "file_type" }`
+            contents = builtins.readDir dir;
+            
+            # Keep all folder and files except standby, ignore, and `default.nix`
+            filterDir = name: type:
+                name != "default.nix" &&
+                !(lib.hasPrefix "standby." name) &&
+                !(lib.hasPrefix "stby." name) &&
+                !(lib.hasPrefix "ignore." name) &&
+                !(lib.hasPrefix "wip." name) &&
+                ((type == "regular" && lib.hasSuffix ".nix" name) || type == "directory");
+            validNodes = lib.filterAttrs (name: type: filterDir name type) contents;
+    
+            processNode = name: type:
+                let
+                    # Absolute path of the node from the tree root
+                    path = dir + "/${name}";
+                    
+                    # Build the node attrset value
+                    attrValue = 
+                        # If directory
+                        if type == "directory" then
+                            # If there is a `default.nix` -> import `default.nix` as a leaf
+                            if builtins.pathExists (path + "/default.nix") then
+                                import (path + "/default.nix") args
+                            # If not `default.nix` -> recursion as a branch
+                            else
+                                autoImport { dir = path; inherit args; }
+                        # If nix file -> import the file as a leaf
+                        else
+                            import path args;
+                    
+                    # Cleanup for node attrset name
+                    attrName = lib.removeSuffix ".nix" name;
+                in
+                    # Return the attrset { <attrName> = <attrValue> }
+                    lib.nameValuePair attrName attrValue;
+
+        in
+            # lib.mapAttrs' permet de modifier à la fois la CLEF et la VALEUR du dictionnaire (??)
+            lib.mapAttrs' processNode validNodes;
+in
+    autoImport
