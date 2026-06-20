@@ -8,6 +8,7 @@
     - buildContext: { overlays, extraArgs }
     - buildInventory: { hostsPath, hosts, commonModules, confSSH }
         - hosts: AttrSet of { confDir, system, deploySSH }
+        - hosts without `deploySSH` are skipped (e.g. build-only iso images)
 */
 
 { inputs, myLib }:
@@ -23,7 +24,10 @@ in
             inherit (buildInventory) hostsPath hosts commonModules confSSH;
             inherit (buildContext) overlays extraArgs;
             commonModulesResolved = myLib.modules.resolvePaths commonModules;
-            
+
+            # Only hosts with a deploy target join the hive
+            deployHosts = lib.filterAttrs (_: host: host ? deploySSH) hosts;
+
             # Helper: make pkgs
             mkPkgs = pkgsSource: system:
                 import pkgsSource {
@@ -43,14 +47,14 @@ in
 
             hiveMeta = {
                 meta = {
-                    
+
                     # Default
                     specialArgs = extraArgs;
                     nixpkgs = mkPkgs nixpkgs "x86_64-linux";
 
                     # Node
-                    nodeNixpkgs = builtins.mapAttrs mkNodePkgs hosts;
-                    nodeSpecialArgs = builtins.mapAttrs mkNodeSpecialArgs hosts;
+                    nodeNixpkgs = builtins.mapAttrs mkNodePkgs deployHosts;
+                    nodeSpecialArgs = builtins.mapAttrs mkNodeSpecialArgs deployHosts;
                 };
 
                 defaults = { ... }: {
@@ -69,7 +73,7 @@ in
                     targetHost = host.deploySSH.ip;
                     tags = host.deploySSH.tags;
                 };
-            }) hosts;
+            }) deployHosts;
 
         in
             colmena.lib.makeHive (hiveMeta // hiveHosts)
