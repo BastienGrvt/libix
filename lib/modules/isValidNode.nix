@@ -23,4 +23,4 @@ in
     name: type:
         name != "default.nix"
         && !(isIgnored name)
-        && ((type == "regular" && lib.hasSuffix ".nix" name) || type == "directory");
+        && ((type == "regular" && lib.hasSuffix ".nix" name) || type == "directory")
