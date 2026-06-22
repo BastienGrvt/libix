@@ -29,7 +29,7 @@ let
             # Keep all folder and filter according to `isValidNode.nix`
             # NB: import isValidNode manually to avoid bootstrab issues
             isValidNode = import ./isValidNode.nix { inherit inputs myLib; };
-            validNodes = lib.filterAttrs myLib.modules.isValidNode contents;
+            validNodes = lib.filterAttrs isValidNode contents;
     
             processNode = name: type:
                 let
