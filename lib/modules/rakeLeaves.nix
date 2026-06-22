@@ -26,17 +26,9 @@ let
             # Get `dir` contents as the attrset `{ "file_name" = "file_type" }`
             contents = builtins.readDir dir;
             
-            # Keep all folder and files except standby, ignore, and `default.nix`
-            # filterDir = name: type:
-            #     name != "default.nix" &&
-            #     !(lib.hasPrefix "backup." name) &&
-            #     !(lib.hasPrefix "bckp." name) &&
-            #     !(lib.hasPrefix "standby." name) &&
-            #     !(lib.hasPrefix "stby." name) &&
-            #     !(lib.hasPrefix "stb." name) &&
-            #     !(lib.hasPrefix "ignore." name) &&
-            #     ((type == "regular" && lib.hasSuffix ".nix" name) || type == "directory");
-            # validNodes = lib.filterAttrs (name: type: filterDir name type) contents;
+            # Keep all folder and filter according to `isValidNode.nix`
+            # NB: import isValidNode manually to avoid bootstrab issues
+            isValidNode = import ./isValidNode.nix { inherit inputs myLib; };
             validNodes = lib.filterAttrs myLib.modules.isValidNode contents;
     
             processNode = name: type:

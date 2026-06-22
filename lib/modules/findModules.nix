@@ -28,17 +28,7 @@ let
             # Get `dir` contents as the attrset `{ <dir_name> = <dir_type> }`
             contents = builtins.readDir dir;
             
-            # Keep all folder and files except standby, ignore, and `default.nix`
-            # filterDir = name: type:
-            #     name != "default.nix" &&
-            #     !(lib.hasPrefix "backup." name) &&
-            #     !(lib.hasPrefix "bckp." name) &&
-            #     !(lib.hasPrefix "standby." name) &&
-            #     !(lib.hasPrefix "stby." name) &&
-            #     !(lib.hasPrefix "stb." name) &&
-            #     !(lib.hasPrefix "ignore." name) &&
-            #     ((type == "regular" && lib.hasSuffix ".nix" name) || type == "directory");
-            # validNodes = lib.filterAttrs (name: type: filterDir name type) contents;
+            # Keep all folder and filter according to `isValidNode.nix`
             validNodes = lib.filterAttrs myLib.modules.isValidNode contents;
 
             # Function that check if the studied directory is a branch or a leaf
