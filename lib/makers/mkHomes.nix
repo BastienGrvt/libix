@@ -14,6 +14,7 @@
 
 let
     inherit (inputs) self nixpkgs home-manager;
+    hasUnstable = inputs ? nixpkgs-unstable;
     lib = nixpkgs.lib;
 in
     { buildContext, buildInventory }:
@@ -22,24 +23,29 @@ in
             inherit (buildContext) overlays extraArgs;
             commonModulesResolved = myLib.modules.resolvePaths commonModules;
 
+            mkPkgs = pkgsSource: system:
+                import pkgsSource {
+                    inherit system overlays;
+                    config.allowUnfree = true;
+                };
+
             mkHome = home:
                 let
-                    # Cook pkgs
-                    pkgs = import nixpkgs {
-                        system = home.system;
-                        config.allowUnfree = true;
-                        overlays = overlays;
+                    pkgs = mkPkgs nixpkgs home.system;
+
+                    # Special args with unstable pkgs
+                    specialArgs = extraArgs // lib.optionalAttrs hasUnstable {
+                        pkgs-unstable = mkPkgs inputs.nixpkgs-unstable home.system;
                     };
-                    
-                    # Home specific modules
+
                     hmModules = [ { programs.home-manager.enable = true; } ];
                     homeModules = [ "${self}/${homesPath}/${home.confDir}" ];
                 in
                 home-manager.lib.homeManagerConfiguration {
-                    pkgs = pkgs;
-                    extraSpecialArgs = extraArgs;
+                    inherit pkgs;
+                    extraSpecialArgs = specialArgs;
                     modules = commonModulesResolved ++ homeModules ++ hmModules;
                 };
 
-        in 
+        in
             builtins.mapAttrs (name: home: mkHome home) homes

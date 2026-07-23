@@ -1,9 +1,21 @@
-{ inputs, myLib }:
+/**
+    Build devShells from a context and a shell inventory.
+    FROM LLM MUST BE UNDESTAND
 
-# FROM LLM MUST BE UNDESTAND
+    # Type
+    mkShell :: { buildContext, buildInventory } -> AttrSet (AttrSet Derivation)
+
+    # Args
+    - buildContext: { overlays, extraArgs }
+    - buildInventory: { shellsPath, shells }
+        - shells: AttrSet of { confDir, system }
+*/
+
+{ inputs, myLib }:
 
 let
     inherit (inputs) self nixpkgs;
+    hasUnstable = inputs ? nixpkgs-unstable;
     lib = nixpkgs.lib;
 
     # From "python/proj1.nix", build the chain: [ base.nix python/base.nix python/proj1.nix ]
@@ -40,14 +52,20 @@ in
             inherit (buildContext) overlays extraArgs;
             shellsDir = "${self}/${shellsPath}";
 
+            mkPkgs = pkgsSource: system:
+                import pkgsSource {
+                    inherit system overlays;
+                    config.allowUnfree = true;
+                };
+
             mkShell = name: shell:
                 let
-                    pkgs = import nixpkgs {
-                        system = shell.system;
-                        config.allowUnfree = true;
-                        inherit overlays;
+                    pkgs = mkPkgs nixpkgs shell.system;
+                    # Special args with unstable pkgs
+                    specialArgs = extraArgs // lib.optionalAttrs hasUnstable {
+                        pkgs-unstable = mkPkgs inputs.nixpkgs-unstable shell.system;
                     };
-                    args = extraArgs // { inherit pkgs lib; };
+                    args = specialArgs // { inherit pkgs lib; };
                     chain = buildChain shellsDir shell.confDir;
                     configs = map (f: import f args) chain;
                 in
@@ -61,4 +79,3 @@ in
                 lib.recursiveUpdate acc
                     (builtins.listToAttrs [ (mkShell name shell) ])
             ) {} shells
-
